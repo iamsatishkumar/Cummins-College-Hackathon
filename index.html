@@ -1,19 +1,348 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Satish's Site</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            text-align: center;
-            margin-top: 50px;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HDIMS - Netlify-ready Dashboard (HTML/CSS/JS)</title>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#06b6d4; --glass: rgba(255,255,255,0.03);
+      --success: #10b981; --danger:#ef4444; --surface:#0b1220;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071128 0%, #071726 100%);color:#e6eef8}
+    .app{max-width:1200px;margin:28px auto;padding:20px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:16px}
+    h1{font-size:20px;margin:0}
+    .sub{color:var(--muted);font-size:13px}
+    .controls{display:flex;gap:12px;align-items:center;margin-top:14px;flex-wrap:wrap}
+    .card{background:var(--card);border-radius:12px;padding:16px;box-shadow:0 6px 18px rgba(2,6,23,0.6);}
+    .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:16px}
+    .kpi{padding:12px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);}
+    .kpi .label{font-size:12px;color:var(--muted)}
+    .kpi .value{font-size:20px;margin-top:6px}
+    .layout{display:grid;grid-template-columns:1fr 380px;gap:16px;margin-top:18px}
+    .filters{display:flex;gap:8px}
+    select,input{background:var(--glass);border:1px solid rgba(255,255,255,0.04);color:inherit;padding:8px;border-radius:8px}
+    button{background:var(--accent);border:none;padding:8px 12px;border-radius:8px;color:#042;cursor:pointer}
+    button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+    .list{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+    .list-item{display:flex;justify-content:space-between;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)}
+    .chart-wrap{height:320px}
+    footer{color:var(--muted);font-size:12px;margin-top:18px;text-align:center}
+    /* Responsive */
+    @media (max-width:900px){.layout{grid-template-columns:1fr}}
+  </style>
 </head>
 <body>
-    <h1>Shivang's Site is Live!</h1>
-    <p>Welcome to the new site.</p>
+  <div class="app">
+    <header>
+      <div>
+        <h1>HDIMS — Facility Dashboard (Static HTML/CSS/JS)</h1>
+        <div class="sub">Netlify-ready single-file dashboard (vanilla JS). Use this as a starting point for integration.</div>
+      </div>
+      <div style="text-align:right">
+        <div class="sub">Environment: Demo data only</div>
+        <div style="margin-top:8px"><button id="exportBtn">Export CSV</button></div>
+      </div>
+    </header>
+
+    <div class="controls">
+      <div class="card" style="padding:12px;display:flex;gap:8px;align-items:center">
+        <label class="sub" style="margin-right:6px">State</label>
+        <select id="stateFilter"></select>
+        <label class="sub" style="margin-left:8px">District</label>
+        <select id="districtFilter"></select>
+        <label class="sub" style="margin-left:8px">Program</label>
+        <select id="programFilter"></select>
+        <button id="resetBtn" class="ghost">Reset</button>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="card kpi">
+        <div class="label">Facilities Reporting</div>
+        <div class="value" id="kpiFacilities">—</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">Total Cases (period)</div>
+        <div class="value" id="kpiCases">—</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">New Admissions</div>
+        <div class="value" id="kpiAdmissions">—</div>
+      </div>
+      <div class="card kpi">
+        <div class="label">Data Quality Score</div>
+        <div class="value" id="kpiDQ">—</div>
+      </div>
+    </div>
+
+    <div class="layout">
+      <div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div>
+              <strong>Trends</strong>
+              <div class="sub">Monthly cases — interactive chart</div>
+            </div>
+            <div>
+              <label class="sub">View</label>
+              <select id="chartView">
+                <option value="cases">Cases</option>
+                <option value="admissions">Admissions</option>
+                <option value="imr">IMR</option>
+              </select>
+            </div>
+          </div>
+          <div class="chart-wrap" style="margin-top:12px">
+            <canvas id="mainChart"></canvas>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <strong>Facility Reporting List</strong>
+          <div class="sub">Latest submissions from facilities (click a row to view details)</div>
+          <div class="list" id="facilityList" style="margin-top:10px"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <strong>Filters & Quick Insights</strong>
+          <div class="sub">Use these controls to drill down</div>
+
+          <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <label class="sub">Period</label>
+              <input type="month" id="periodFrom" />
+              <span class="sub">to</span>
+              <input type="month" id="periodTo" />
+            </div>
+
+            <div style="display:flex;gap:8px;align-items:center">
+              <button id="applyBtn">Apply</button>
+              <button id="downloadJSON" class="ghost">Download JSON</button>
+            </div>
+
+            <hr style="border:0;border-top:1px solid rgba(255,255,255,0.04);margin:8px 0">
+
+            <div>
+              <div class="sub">Top 5 Districts by Cases</div>
+              <div id="topDistricts" style="margin-top:8px"></div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <strong>Notes</strong>
+          <div class="sub">This is a static demo front-end using vanilla JS, Chart.js and sample data. Replace the sample data or wire to your APIs for production. Netlify-ready: upload this single HTML file as the project index.html.</div>
+        </div>
+      </div>
+    </div>
+
+    <footer>HDIMS demo • Data sample only • Built for Netlify (single-file deploy)</footer>
+  </div>
+
+  <script>
+    // ---------------- Sample dataset (replace with real API calls) ----------------
+    const SAMPLE_DATA = (function(){
+      // generate mock data for 6 months, 3 states, 2-3 districts each, multiple facilities
+      const states = {
+        'Kerala':['Kochi','Ernakulam','Thrissur'],
+        'Maharashtra':['Mumbai','Pune','Nagpur'],
+        'Tamil Nadu':['Chennai','Coimbatore']
+      };
+      const programs = ['NPCDCS','Malaria','Maternal Health'];
+      const months = ['2025-04','2025-05','2025-06','2025-07','2025-08','2025-09'];
+      let items = [];
+      let id = 1;
+      for(const st in states){
+        states[st].forEach(dist=>{
+          for(let f=1; f<=6; f++){
+            const facility = `${dist}-Facility-${f}`;
+            months.forEach(m=>{
+              const cases = Math.floor(Math.random()*120);
+              const admissions = Math.floor(cases*0.3);
+              const imr = +(Math.random()*2 + 0.5).toFixed(2);
+              const dq = Math.floor(70 + Math.random()*30);
+              const program = programs[Math.floor(Math.random()*programs.length)];
+              items.push({id:id++, state:st, district:dist, facility, month:m, program, cases, admissions, imr, dq, reportedAt: m + '-10'});
+            });
+          }
+        })
+      }
+      return {items, states:Object.keys(states), programs, months};
+    })();
+
+    // ---------------- UI wiring ----------------
+    const stateFilter = document.getElementById('stateFilter');
+    const districtFilter = document.getElementById('districtFilter');
+    const programFilter = document.getElementById('programFilter');
+    const resetBtn = document.getElementById('resetBtn');
+    const applyBtn = document.getElementById('applyBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const downloadJSON = document.getElementById('downloadJSON');
+    const chartView = document.getElementById('chartView');
+
+    // KPIs
+    const kpiFacilities = document.getElementById('kpiFacilities');
+    const kpiCases = document.getElementById('kpiCases');
+    const kpiAdmissions = document.getElementById('kpiAdmissions');
+    const kpiDQ = document.getElementById('kpiDQ');
+
+    // lists
+    const facilityList = document.getElementById('facilityList');
+    const topDistricts = document.getElementById('topDistricts');
+
+    // chart
+    const ctx = document.getElementById('mainChart').getContext('2d');
+    let mainChart;
+
+    // init filters
+    function initFilters(){
+      stateFilter.innerHTML = '<option value="">All States</option>' + SAMPLE_DATA.states.map(s=>`<option>${s}</option>`).join('');
+      programFilter.innerHTML = '<option value="">All Programs</option>' + SAMPLE_DATA.programs.map(p=>`<option>${p}</option>`).join('');
+      populateDistricts();
+    }
+    function populateDistricts(){
+      const st = stateFilter.value;
+      let dists = [];
+      if(!st){
+        // collect unique
+        dists = Array.from(new Set(SAMPLE_DATA.items.map(x=>x.district))).sort();
+      } else {
+        dists = Array.from(new Set(SAMPLE_DATA.items.filter(x=>x.state===st).map(x=>x.district))).sort();
+      }
+      districtFilter.innerHTML = '<option value="">All Districts</option>' + dists.map(d=>`<option>${d}</option>`).join('');
+    }
+
+    stateFilter.addEventListener('change', ()=>{populateDistricts(); render();});
+    districtFilter.addEventListener('change', render);
+    programFilter.addEventListener('change', render);
+    chartView.addEventListener('change', renderChart);
+    resetBtn.addEventListener('click', ()=>{stateFilter.value='';districtFilter.value='';programFilter.value='';document.getElementById('periodFrom').value='';document.getElementById('periodTo').value='';populateDistricts();render();});
+    applyBtn.addEventListener('click', render);
+    exportBtn.addEventListener('click', ()=>{exportCSV(filteredItems());});
+    downloadJSON.addEventListener('click', ()=>{downloadJSONFile(filteredItems())});
+
+    // filtering logic
+    function filteredItems(){
+      const st = stateFilter.value;
+      const d = districtFilter.value;
+      const p = programFilter.value;
+      const from = document.getElementById('periodFrom').value; // YYYY-MM
+      const to = document.getElementById('periodTo').value;
+      return SAMPLE_DATA.items.filter(it=>{
+        if(st && it.state!==st) return false;
+        if(d && it.district!==d) return false;
+        if(p && it.program!==p) return false;
+        if(from && it.month < from) return false;
+        if(to && it.month > to) return false;
+        return true;
+      });
+    }
+
+    // KPI calculations
+    function renderKPIs(items){
+      const facilities = new Set(items.map(i=>i.facility)).size;
+      const totalCases = items.reduce((s,i)=>s+i.cases,0);
+      const totalAdmissions = items.reduce((s,i)=>s+i.admissions,0);
+      const avgDQ = items.length ? Math.round(items.reduce((s,i)=>s+i.dq,0)/items.length) : 0;
+      kpiFacilities.textContent = facilities;
+      kpiCases.textContent = totalCases;
+      kpiAdmissions.textContent = totalAdmissions;
+      kpiDQ.textContent = avgDQ + '%';
+    }
+
+    // facility list render
+    function renderFacilityList(items){
+      const latestByFacility = {};
+      items.forEach(it=>{
+        if(!latestByFacility[it.facility] || latestByFacility[it.facility].reportedAt < it.reportedAt) latestByFacility[it.facility]=it;
+      });
+      const arr = Object.values(latestByFacility).sort((a,b)=>b.reportedAt.localeCompare(a.reportedAt));
+      facilityList.innerHTML = arr.slice(0,20).map(it=>`<div class="list-item" data-fac="${it.facility}"><div><strong>${it.facility}</strong><div class="sub">${it.district}, ${it.state} • ${it.program}</div></div><div style="text-align:right"><div>${it.cases} cases</div><div class="sub">DQ ${it.dq}%</div></div></div>`).join('');
+      // add click handlers
+      facilityList.querySelectorAll('.list-item').forEach(node=>node.addEventListener('click',()=>{
+        const fac = node.getAttribute('data-fac');
+        const data = arr.find(x=>x.facility===fac);
+        alert(`${data.facility}\n${data.state} / ${data.district}\nProgram: ${data.program}\nMonth: ${data.month}\nCases: ${data.cases}\nAdmissions: ${data.admissions}\nIMR: ${data.imr}\nDQ: ${data.dq}%`);
+      }));
+    }
+
+    // top districts
+    function renderTopDistricts(items){
+      const byDistrict = {};
+      items.forEach(i=>{byDistrict[i.district]=(byDistrict[i.district]||0)+i.cases});
+      const sorted = Object.entries(byDistrict).sort((a,b)=>b[1]-a[1]).slice(0,5);
+      topDistricts.innerHTML = sorted.map(s=>`<div style="padding:6px;margin-bottom:6px;border-radius:6px;background:rgba(255,255,255,0.02);display:flex;justify-content:space-between"><div>${s[0]}</div><div class="sub">${s[1]} cases</div></div>`).join('');
+    }
+
+    // chart rendering
+    function renderChart(){
+      const view = chartView.value;
+      // group by month
+      const items = filteredItems();
+      const byMonth = {};
+      SAMPLE_DATA.months.forEach(m=>byMonth[m]={cases:0,admissions:0,imrSum:0,imrCount:0});
+      items.forEach(it=>{
+        if(!byMonth[it.month]) byMonth[it.month]={cases:0,admissions:0,imrSum:0,imrCount:0};
+        byMonth[it.month].cases += it.cases;
+        byMonth[it.month].admissions += it.admissions;
+        byMonth[it.month].imrSum += it.imr;
+        byMonth[it.month].imrCount += 1;
+      });
+      const labels = Object.keys(byMonth);
+      const data = labels.map(l=> view==='cases' ? byMonth[l].cases : view==='admissions' ? byMonth[l].admissions : (byMonth[l].imrCount? +(byMonth[l].imrSum/byMonth[l].imrCount).toFixed(2):0));
+
+      const datasetLabel = view==='cases' ? 'Cases' : view==='admissions' ? 'Admissions' : 'Avg IMR';
+
+      if(mainChart) mainChart.destroy();
+      mainChart = new Chart(ctx,{
+        type: view==='imr' ? 'line' : 'bar',
+        data:{labels, datasets:[{label:datasetLabel, data, fill:false, tension:0.3}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
+      });
+    }
+
+    // overall render
+    function render(){
+      const items = filteredItems();
+      renderKPIs(items);
+      renderFacilityList(items);
+      renderTopDistricts(items);
+      renderChart();
+    }
+
+    // export CSV helper
+    function exportCSV(items){
+      if(items.length===0){alert('No rows to export'); return}
+      const keys = Object.keys(items[0]);
+      const rows = items.map(r=>keys.map(k=>`"${(''+r[k]).replace(/"/g,'""')}"`).join(','));
+      const csv = keys.join(',') + '\n' + rows.join('\n');
+      const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'hdims_export.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+    function downloadJSONFile(items){
+      const blob = new Blob([JSON.stringify(items, null, 2)], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'hdims_export.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+
+    // init
+    initFilters();
+    render();
+
+    // small UX: allow clicking KPI to toggle chart view
+    document.getElementById('kpiCases').addEventListener('click', ()=>{chartView.value='cases';renderChart();});
+    document.getElementById('kpiAdmissions').addEventListener('click', ()=>{chartView.value='admissions';renderChart();});
+    document.getElementById('kpiDQ').addEventListener('click', ()=>{chartView.value='imr';renderChart();});
+
+  </script>
 </body>
 </html>
